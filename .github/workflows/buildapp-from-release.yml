@@ -14,12 +14,20 @@ on:
                 required: false
                 type: boolean
             decrypted_instagram_url:
-                description: "Direct URL to the decrypted Instagram IPA"
+                description: "Direct URL to the decrypted Instagram IPA (must match the target — a 410.x IPA for IG 410)"
                 default: ""
                 required: true
                 type: string
+            target:
+                description: "IG target (410 auto-picks the latest -410 release)"
+                default: "434"
+                required: false
+                type: choice
+                options:
+                    - "434"
+                    - "410"
             release_tag:
-                description: "Release tag to pull assets from (leave empty for latest, e.g. v1.3.0)"
+                description: "Release tag to pull assets from (leave empty for latest of target, e.g. v1.3.3-410)"
                 default: ""
                 required: false
                 type: string
@@ -71,10 +79,15 @@ jobs:
               env:
                 GH_TOKEN: ${{ github.token }}
                 INPUT_TAG: ${{ inputs.release_tag }}
+                INPUT_TARGET: ${{ inputs.target }}
               run: |
                 set -euo pipefail
                 if [ -n "$INPUT_TAG" ]; then
                   TAG="$INPUT_TAG"
+                elif [ "$INPUT_TARGET" = "410" ]; then
+                  # Newest release whose tag ends in -410.
+                  TAG="$(gh release list --repo "$UPSTREAM_REPO" --limit 50 --json tagName -q '[.[].tagName | select(endswith("-410"))][0] // empty')"
+                  [ -n "$TAG" ] || { echo "::error::No -410 release found on $UPSTREAM_REPO."; exit 1; }
                 else
                   TAG="$(gh release view --repo "$UPSTREAM_REPO" --json tagName -q .tagName)"
                 fi
